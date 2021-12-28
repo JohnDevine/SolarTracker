@@ -1,12 +1,18 @@
 # SolarTracker
-Microprocessor used: esp32doit-devkit-v1
-Light Sensor Used: BH1750 
-Servo Used: MG995 (only capable of 180 sweep)
-Development environment : VSC and Platformio
-
-This uses a pair of BH1750 light sensors to track the sun and drive 2 x servos to face the brightest sun.
+This is a two axis tracker that uses a pair of BH1750 light sensors 
+to track the sun and drive 2 x servos to face the brightest sun.
 
 It first does a full sweep then moves to brightest light. After a time it will sweep a small window and move to that position. If the position is at the very end of the window it will initiate a full sweep.
+
+Microprocessor used: esp32doit-devkit-v1
+Light Sensor Used: BH1750 (Board version is GY-302)
+Servo Used: MG995 (only capable of 180 sweep)
+Development environment : VSC and Platformio
+Libraries:
+    starmbi/hp_BH1750@^1.0.0
+	madhephaestus/ESP32Servo@^0.9.0
+	bblanchon/ArduinoTrace@^1.2.0
+
 =======================================================
 BH1750 info.
 I bought the BH1750s here (No idea why AliExpress gives this huge URL):
@@ -20,9 +26,13 @@ multipleReadLightSensor routine that discards the first reading and does
 
 int lightSensorMultipleReadCountNeeded = 5; // Number of readings needed to get a valid reading
 
-reads and after discarding the first reading , averages the others. Also from the datasheet I set the wait time (120ms) after each sense before reading to lightSensorWaitReadTime.
+reads and after discarding the first reading , averages the others. Also from the datasheet I set the wait time (120ms) to 
 
-3. The sensor overloads when in bright sun. The sensor can read lux from 1 - 65535 (see datasheet) with an accuracy of 20%. The brightest sunlight is 120,000 lux (wikipedia) so you need a 50% filter above the sensor to get values in range.
+int lightSensorWaitReadTime = 120;
+
+after each sense before reading value.
+
+3. The sensor overloads when in bright sun. The sensor can read lux from 1 - 65535 (see datasheet) with an accuracy of 20%. The brightest sunlight is 120,000 lux (wikipedia) so you need a 50% neutral density filter (An ND2 filter) above the sensor to get values in range.
 =======================================================
 Servo Info:
 The servos I used are MG995. They can handle quite a load. I bought them here:
@@ -30,7 +40,7 @@ https://star.aliexpress.com/share/share.htm?image=U242cb795d7ad461989c7349980b2b
 
 Problems & solutions:
 
-1. The PWM can be driven directly off the ESP32. The power though for small sized solar panels (40cm diagonal) is too much draw for the ESP32 and causes intermittent problems particularly on big sweeps. Also note that the speed is dependent on the voltage. I used a voltage regulator and set it to 6V. NOTE this is very important, see next problem.
+1. The PWM can be driven directly off the ESP32. The power though for small sized solar panels (40cm diagonal) is too much draw for the ESP32 and causes intermittent problems particularly on big sweeps (10ma at idle, 1200ma stall). Also note that the speed is dependent on the voltage. I used a voltage regulator and set it to 6V. NOTE this is very important, see next problem.
 
 2. There is no feedback from the servo. This means that if you are at 0 degrees and tell it to go to 180 it will take quite a while to get there and there is no way of knowing if it gets there. (I thought of monitoring the amperage usage on the servo and watching it go to a resting amperage .. maybe later). Given that I use a varying delay based on the previous angle and the new angle required. 
 The Delay in ms is 

@@ -1,4 +1,4 @@
-#define ARDUINOTRACE_ENABLE 1 // Enable ArduinoTrace (0 = disable, 1 = enable)
+#define ARDUINOTRACE_ENABLE 0 // Enable ArduinoTrace (0 = disable, 1 = enable)
 #include <ArduinoTrace.h>
 #include <Arduino.h>
 #include <ESP32Servo.h>
@@ -36,7 +36,7 @@ int trackMaxPulseWidth = 2500;
 // Step size for track across servo
 int trackCoarseStepSize = 10; // degrees
 int trackFineStepSize = 1;    // degrees
-int trackWindowSize = 10;     // Window is this size degrees either side of current position
+int trackWindowSize = 5;     // Window is this size degrees either side of current position
 
 // BH1750 Sensors
 hp_BH1750 lightSensor1;
@@ -48,7 +48,7 @@ float lightSensor2Reading = 0;
 
 // BH1750 wait read time (in ms) (Data sheet says 120 max)
 int lightSensorWaitReadTime = 120;
-int lightSensorMultipleReadCountNeeded = 5; // Number of readings needed to get a valid reading
+int lightSensorMultipleReadCountNeeded = 4; // Number of readings needed to get a valid reading
 
 // BH1750 Sensor status
 bool lightSensor1Status = false;
@@ -397,8 +397,8 @@ void loop()
             oldMaxIndex = maxIndex;
             maxIndex = sweepServoFindBestLightAndPositionThere(lightSensorReadingsUpDown, lightSensor2, trackUpDownServo, maxIndex - trackWindowSize, maxIndex + trackWindowSize, trackFineStepSize);
             // Every SUN_TRACK_READING_INTERVAL_SECONDS
-            // delay(SUN_TRACK_READING_INTERVAL_SECONDS * 1000);
-            delay(1000);
+            delay(SUN_TRACK_READING_INTERVAL_SECONDS * 1000);
+            // delay(1000);
         }
     }
 }

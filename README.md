@@ -32,7 +32,7 @@ int lightSensorWaitReadTime = 120;
 
 after each sense before reading value.
 
-3. The sensor overloads when in bright sun. The sensor can read lux from 1 - 65535 (see datasheet) with an accuracy of 20%. The brightest sunlight is 120,000 lux (wikipedia) so you need a 50% neutral density filter (An ND2 filter) above the sensor to get values in range.
+3. The sensor overloads when in bright sun. The sensor can read lux from 1 - 65535 (see datasheet) with an accuracy of 20%. The brightest sunlight is 120,000 lux (wikipedia) so you need a neutral density filter (I used An ND16 filter as ND4 & ND8 did not attenuate enough .. I am 14 degrees off the equator so maybe an extreme case) above the sensor to get values in range.
 =======================================================
 Servo Info:
 The servos I used are MG995. They can handle quite a load. I bought them here:

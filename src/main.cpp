@@ -1,8 +1,18 @@
-#define ARDUINOTRACE_ENABLE 0 // Enable ArduinoTrace (0 = disable, 1 = enable)
+#define ARDUINOTRACE_ENABLE false // Enable ArduinoTrace (false = disable, true = enable)
 #include <ArduinoTrace.h>
 #include <Arduino.h>
 #include <ESP32Servo.h>
 #include <hp_BH1750.h>
+
+#define GREENLED 2 // GPIO2 is the Green LED on DoIt ESP32
+
+// Error Blinks
+#define BLINK_COUNT_01 1 // Light Sensor 1 failed
+#define BLINK_COUNT_02 2 // Light Sensor 2 failed
+#define BLINK_COUNT_03 3 // Servo Across failed
+#define BLINK_COUNT_04 4 // Servo UpDown failed
+
+#define BLINK_DELAY 300 //  Delay between blinks in ms
 
 Servo trackAcrossServo; // Servo for tracking across the sun
 Servo trackUpDownServo; // Servo for tracking up/down the sun
@@ -36,23 +46,23 @@ int trackMaxPulseWidth = 2500;
 // Step size for track across servo
 int trackCoarseStepSize = 10; // degrees
 int trackFineStepSize = 1;    // degrees
-int trackWindowSize = 5;     // Window is this size degrees either side of current position
+int trackWindowSize = 5;      // Window is this size degrees either side of current position
 
 // BH1750 Sensors
-hp_BH1750 lightSensor1;
-hp_BH1750 lightSensor2;
+hp_BH1750 lightSensorUpDown;
+hp_BH1750 lightSensorAcross;
 
 // BH1750 Sensor readings
-float lightSensor1Reading = 0;
-float lightSensor2Reading = 0;
+float lightSensorUpDownReading = 0;
+float lightSensorAcrossReading = 0;
 
 // BH1750 wait read time (in ms) (Data sheet says 120 max)
 int lightSensorWaitReadTime = 120;
 int lightSensorMultipleReadCountNeeded = 4; // Number of readings needed to get a valid reading
 
 // BH1750 Sensor status
-bool lightSensor1Status = false;
-bool lightSensor2Status = false;
+bool lightSensorUpDownStatus = false;
+bool lightSensorAcrossStatus = false;
 
 bool lightSensorForceRead = true; // Force a reading from the BH1750 sensor
 
@@ -72,6 +82,38 @@ float lightSensorReadingsUpDown[181];
  * every 5 minutes.
  */
 #define SUN_TRACK_READING_INTERVAL_SECONDS 300
+
+// Blink the GREENLED blinkcount times
+void blinkLED(int pin, int blinkcount, bool forever)
+{
+
+    if (forever)
+    {
+        while (true)
+        {
+            for (int i = 0; i < blinkcount; i++)
+            {
+                digitalWrite(pin, HIGH);
+                delay(BLINK_DELAY);
+                digitalWrite(pin, LOW);
+                delay(BLINK_DELAY);
+            }
+            delay(3000);
+        }
+    }
+    else
+    {
+
+        for (int i = 0; i < blinkcount; i++)
+        {
+            digitalWrite(pin, HIGH);
+            delay(BLINK_DELAY);
+            digitalWrite(pin, LOW);
+            delay(BLINK_DELAY);
+        }
+        delay(3000);
+    }
+}
 
 // BH1750 Sensor initialization
 bool initLightSensor(hp_BH1750 &sensor, int pin)
@@ -314,38 +356,54 @@ void setup()
 {
     // Initialize Serial Port
     Serial.begin(115200);
+    pinMode(GREENLED, OUTPUT);
 
     // Initialize BH1750 Sensors
-    if (initLightSensor(lightSensor1, BH1750_TO_VCC) == false)
+    /*********************************************************************************************
+    if (initLightSensor(lightSensorUpDown, BH1750_TO_VCC) == false)
     {
         Serial.println("Failed to initialize BH1750 Sensor 1");
-        lightSensor1Status = false;
+        lightSensorUpDownStatus = false;
+        // Loop forever blinkLED
+        blinkLED(GREENLED, BLINK_COUNT_01, true);
     }
     else
     {
-        lightSensor1Status = true;
+        lightSensorUpDownStatus = true;
     }
-
-    if (initLightSensor(lightSensor2, BH1750_TO_GROUND) == false)
+*/
+    if (initLightSensor(lightSensorAcross, BH1750_TO_GROUND) == false)
     {
         Serial.println("Failed to initialize BH1750 Sensor 2");
-        lightSensor2Status = false;
+        lightSensorAcrossStatus = false;
+        // Loop forever blinkLED
+        blinkLED(GREENLED, BLINK_COUNT_02, true);
     }
     else
     {
-        lightSensor2Status = true;
+        lightSensorAcrossStatus = true;
     }
 
     // Initialize Servos
     if (initServo(trackAcrossServo, trackAcrossPin) == false)
     {
         Serial.println("Failed to initialize trackAcrossServo");
+        // Loop forever blinkLED
+        blinkLED(GREENLED, BLINK_COUNT_03, true);
     }
 
     if (initServo(trackUpDownServo, trackUpDownPin) == false)
     {
         Serial.println("Failed to initialize trackUpDownServo");
+        // Loop forever blinkLED
+        blinkLED(GREENLED, BLINK_COUNT_04, true);
     }
+
+    // Centre survos for 10 seconds so user can align and centre
+
+    moveServo(trackAcrossServo, 90);
+    moveServo(trackUpDownServo, 90);
+    delay(10000);
 }
 
 // Main loop
@@ -359,18 +417,18 @@ void loop()
     // testServo(trackUpDownServo);
 
     // Test BH1750 Sensors
-    /* if (lightSensor1Status)
+    /* if (lightSensorUpDownStatus)
     {
-        lightSensor1Reading = testLightSensor(lightSensor1);
+        lightSensorUpDownReading = testLightSensor(lightSensorUpDown);
     }
-    if (lightSensor2Status)
+    if (lightSensorAcrossStatus)
     {
-        lightSensor2Reading = testLightSensor(lightSensor2);
+        lightSensorAcrossReading = testLightSensor(lightSensorAcross);
     }
     */
 
     // Initialise by coarse sweeping across upDownServo and point at strongest reading
-    maxIndex = sweepServoFindBestLightAndPositionThere(lightSensorReadingsUpDown, lightSensor2, trackUpDownServo, 0, 180, trackCoarseStepSize);
+    maxIndex = sweepServoFindBestLightAndPositionThere(lightSensorReadingsUpDown, lightSensorAcross, trackUpDownServo, 0, 180, trackCoarseStepSize);
 
     oldMaxIndex = maxIndex; // initialise oldMaxIndex to current maxIndex
 
@@ -379,23 +437,23 @@ void loop()
 
         // look trackWindowSize degrees either side of current posn for new max and move there
         // If the boat moves a lot it will do a full sweep again.
-
-        Serial.println("maxIndex: ");
-        Serial.println(maxIndex);
-        Serial.println("oldMaxIndex: ");
-        Serial.println(oldMaxIndex);
-        Serial.println("trackWindowSize: ");
-        Serial.println(trackWindowSize);
-
+        /*
+                Serial.println("maxIndex: ");
+                Serial.println(maxIndex);
+                Serial.println("oldMaxIndex: ");
+                Serial.println(oldMaxIndex);
+                Serial.println("trackWindowSize: ");
+                Serial.println(trackWindowSize);
+        */
         if (maxIndex == oldMaxIndex - trackWindowSize || maxIndex == oldMaxIndex + trackWindowSize)
         {
-            maxIndex = sweepServoFindBestLightAndPositionThere(lightSensorReadingsUpDown, lightSensor2, trackUpDownServo, 0, 180, trackCoarseStepSize);
+            maxIndex = sweepServoFindBestLightAndPositionThere(lightSensorReadingsUpDown, lightSensorAcross, trackUpDownServo, 0, 180, trackCoarseStepSize);
             oldMaxIndex = maxIndex; // update oldMaxIndex to current maxIndex
         }
         else
         {
             oldMaxIndex = maxIndex;
-            maxIndex = sweepServoFindBestLightAndPositionThere(lightSensorReadingsUpDown, lightSensor2, trackUpDownServo, maxIndex - trackWindowSize, maxIndex + trackWindowSize, trackFineStepSize);
+            maxIndex = sweepServoFindBestLightAndPositionThere(lightSensorReadingsUpDown, lightSensorAcross, trackUpDownServo, maxIndex - trackWindowSize, maxIndex + trackWindowSize, trackFineStepSize);
             // Every SUN_TRACK_READING_INTERVAL_SECONDS
             delay(SUN_TRACK_READING_INTERVAL_SECONDS * 1000);
             // delay(1000);
